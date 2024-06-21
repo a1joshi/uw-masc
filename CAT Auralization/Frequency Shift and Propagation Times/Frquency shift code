@@ -1,0 +1,108 @@
+import numpy as np
+import pandas as pd
+from scipy import signal
+import matplotlib.pyplot as plt
+from scipy.signal import spectrogram, find_peaks
+from sympy import pretty_print as pp, latex
+from sympy.abc import s
+plt.rcParams['font.size'] = 16  # Base font size
+
+dist = 1
+fs = 100       # sampling frequency
+tstep = 1/fs   # time-domain resolution
+N = 500           # number of samples for fft (was 200)
+fstep = fs/N   # frequency resolution
+
+# t = np.arange(0,0.1,tstep)
+t = np.arange(N)/float(fs)
+
+dfs1 = pd.read_excel("1000 st.xlsx")
+dfs2 = pd.read_excel("3000 st.xlsx")
+dfs3 = pd.read_excel("5000 st.xlsx")
+dfs4 = pd.read_excel("7500 st.xlsx")
+dfs5 = pd.read_excel("10000 st.xlsx")
+dfs6 = pd.read_excel("15000 st.xlsx")
+
+dfc1 = pd.read_excel("1000 cur.xlsx")
+dfc2 = pd.read_excel("3000 cur.xlsx")
+dfc3 = pd.read_excel("5000 cur.xlsx")
+dfc4 = pd.read_excel("7500 cur.xlsx")
+dfc5 = pd.read_excel("10000 cur.xlsx")
+dfc6 = pd.read_excel("15000 cur.xlsx")
+
+r = np.array(dfs1["r"],dtype=int)
+
+fs1 = np.array(dfs1["fo"],dtype=float)
+fs2 = np.array(dfs2["fo"],dtype=float)
+fs3 = np.array(dfs3["fo"],dtype=float)
+fs4 = np.array(dfs4["fo"],dtype=float)
+fs5 = np.array(dfs5["fo"],dtype=float)
+fs6 = np.array(dfs6["fo"],dtype=float)
+
+fc1 = np.array(dfc1["fo"],dtype=float)
+fc2 = np.array(dfc2["fo"],dtype=float)
+fc3 = np.array(dfc3["fo"],dtype=float)
+fc4 = np.array(dfc4["fo"],dtype=float)
+fc5 = np.array(dfc5["fo"],dtype=float)
+fc6 = np.array(dfc6["fo"],dtype=float)
+
+fs1 = (fs1 - 10)/10
+fs2 = (fs2 - 10)/10
+fs3 = (fs3 - 10)/10
+fs4 = (fs4 - 10)/10
+fs5 = (fs5 - 10)/10
+fs6 = (fs6 - 10)/10
+
+fc1 = (fc1 - 10)/10
+fc2 = (fc2 - 10)/10
+fc3 = (fc3 - 10)/10
+fc4 = (fc4 - 10)/10
+fc5 = (fc5 - 10)/10
+fc6 = (fc6 - 10)/10
+
+figure, ax = plt.subplots(3, 2)
+
+ax[0,0].plot(r,fs1,'-b')
+ax[0,0].plot(r,fc1,'-r')
+ax[0,0].set_title('Frequency Shift, y = |1| km')
+ax[0,0].set_xlabel('x [m]')
+ax[0,0].set_ylabel('f [Hz]')
+ax[0,0].legend(['Straight Ray','Curved Ray'],loc="upper right")
+
+ax[0,1].plot(r,fs2,'-b')
+ax[0,1].plot(r,fc2,'-r')
+ax[0,1].set_title('Frequency Shift, y = |3| km')
+ax[0,1].set_xlabel('x [m]')
+ax[0,1].set_ylabel('f [Hz]')
+ax[0,1].legend(['Straight Ray','Curved Ray'],loc="upper right")
+
+ax[1,0].plot(r,fs3,'-b')
+ax[1,0].plot(r,fc3,'-r')
+ax[1,0].set_title('Frequency Shift, y = |5| km')
+ax[1,0].set_xlabel('x [m]')
+ax[1,0].set_ylabel('f [Hz]')
+ax[1,0].legend(['Straight Ray','Curved Ray'],loc="upper right")
+
+ax[1,1].plot(r,fs4,'-b')
+ax[1,1].plot(r,fc4,'-r')
+ax[1,1].set_title('Frequency Shift, y = |7.5| km')
+ax[1,1].set_xlabel('x [m]')
+ax[1,1].set_ylabel('f [Hz]')
+ax[1,1].legend(['Straight Ray','Curved Ray'],loc="upper right")
+
+ax[2,0].plot(r,fs5,'-b')
+ax[2,0].plot(r,fc5,'-r')
+ax[2,0].set_title('Frequency Shift, y = |10| km')
+ax[2,0].set_xlabel('x [m]')
+ax[2,0].set_ylabel('f [Hz]')
+ax[2,0].legend(['Straight Ray','Curved Ray'],loc="upper right")
+
+ax[2,1].plot(r,fs6,'-b')
+ax[2,1].plot(r,fc6,'-r')
+ax[2,1].set_title('Frequency Shift, y = |15| km')
+ax[2,1].set_xlabel('x [m]')
+ax[2,1].set_ylabel('f [Hz]')
+ax[2,1].legend(['Straight Ray','Curved Ray'],loc="upper right")
+
+figure.set_size_inches(20, 30)
+plt.show()
