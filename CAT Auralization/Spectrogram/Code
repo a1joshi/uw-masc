@@ -1,0 +1,139 @@
+# Spectrogram with interpolation and kolmogorov
+
+import numpy as np
+import pandas as pd
+from scipy import signal
+import scipy.interpolate as sp
+import matplotlib.pyplot as plt
+from scipy.signal import spectrogram, find_peaks
+from scipy.fft import fft, fftfreq
+from matplotlib.mlab import window_hanning
+import pdb
+from matplotlib.colors import LogNorm
+
+# straight ray tracing
+df1 = pd.read_excel("15000 st.xlsx")
+pt1 = np.array(df1["pt"],dtype=float)
+td1 = np.array(df1["time delay"],dtype=float)
+sploss1 = np.array(df1["sploss"],dtype=float)
+fo1 = np.array(df1["fo"],dtype=float)
+r1 = np.array(df1["r"],dtype=int)
+A1 = np.array(df1["amplitude"],dtype=float)
+
+# curved ray tracing
+df2 = pd.read_excel("15000 cur.xlsx")
+pt2 = np.array(df2["pt"],dtype=float)
+td2 = np.array(df2["time delay"],dtype=float)
+sploss2 = np.array(df2["sploss"],dtype=float)
+fo2 = np.array(df2["fo"],dtype=float)
+r2 = np.array(df2["r"],dtype=int)
+A2 = (sploss2)**2
+
+
+# Defining source frequence and amplitude
+minFr=1
+maxFr=20
+nbFr=100
+distance= 15 #km
+freqSource = np.linspace(minFr,maxFr,nbFr)
+ampSource  = (freqSource/freqSource[0])**-(5/3)  # We need to think a slightly better spectral representation
+
+time= np.linspace(0,500,5001)
+
+pt_st = sp.interp1d(time, pt1, kind='linear')
+td_st = sp.interp1d(time, td1, kind='linear')
+A_st  = sp.interp1d(time, A1,  kind='linear')
+D_st = sp.interp1d(time, fo1,  kind='linear')
+
+pt_cur = sp.interp1d(time, pt2, kind='linear')
+td_cur = sp.interp1d(time, td2, kind='linear')
+A_cur  = sp.interp1d(time, A2,  kind='linear')
+D_cur = sp.interp1d(time, fo2, kind='linear')
+
+sig1=0.0
+sig2=0.0
+
+#Interpolated signal
+
+tend=500
+samples=1000000
+dt = np.linspace(0,tend,samples)
+fs=samples/tend
+
+for ii,fr in enumerate(freqSource):
+  amp=ampSource[ii]
+  sig1 +=  A_st(dt)*amp*np.cos(2*np.pi*(fr)*(dt+td_st(dt)))
+  sig2 +=  A_cur(dt)*amp*np.cos(2*np.pi*(fr)*(dt+td_cur(dt)))
+
+  #########################################
+
+from scipy import fft
+import matplotlib.pyplot as plt
+
+f1, t1, Zxx1 = spectrogram(sig1, fs=int(fs),window=('tukey', 0.5), nperseg = int(6*minFr*fs), noverlap = int(2*minFr*fs))
+f2, t2, Zxx2 = spectrogram(sig2, fs=int(fs),window=('tukey', 0.5), nperseg = int(6*minFr*fs), noverlap = int(2*minFr*fs))
+
+print(Zxx1.shape)
+
+###############################
+
+# Plot spectrogram and peaks
+
+plt.rcParams['font.size'] = 16  # Base font size
+
+figure, (ax1,ax2) = plt.subplots(1, 2)
+
+from scipy.ndimage.filters import gaussian_filter
+
+
+Zxx1 = 10*np.log10(Zxx1)
+Zxx2 = 10*np.log10(Zxx2)
+
+filter=True
+logplot=True
+if filter:
+  Zxx1 = gaussian_filter(Zxx1, sigma=2.5)
+  Zxx2 = gaussian_filter(Zxx2, sigma=2.5)
+
+a = np.nonzero(Zxx1 == np.max(Zxx1))
+peak_time1 = float(t1[a[1]])
+peak_frequency1 = float(f1[a[0]])
+
+a = np.nonzero(Zxx2 == np.max(Zxx2))
+peak_time2 = float(t2[a[1]])
+peak_frequency2 = float(f2[a[0]])
+
+im1 = ax1.pcolormesh(t1, f1, Zxx1, shading='gouraud',vmin=-200)
+ax1.plot(t1, peak_frequency1 * np.ones_like(t1), 'r--')
+ax1.plot(peak_time1*np.ones_like(f1), f1, 'b--')
+ax1.plot(peak_time1,peak_frequency1,'ko')
+# ax1.set_title('Spectrogram (|y| =' + str(distance)+' km), Straight Line Ray-Tracing')
+ax1.legend()
+
+im2 = ax2.pcolormesh(t2, f2, Zxx2, shading='gouraud',vmin=-200)
+ax2.plot(t2, peak_frequency2 * np.ones_like(t2), 'r--')
+ax2.plot(peak_time2*np.ones_like(f2), f2, 'b--')
+ax2.plot(peak_time2,peak_frequency2,'ko')
+# ax2.set_title('Spectrogram (|y| =' + str(distance)+' km), Curved Ray-Tracing')
+ax2.legend()
+
+
+if logplot:
+  ax1.set_ylim(minFr/20,10*maxFr)
+  ax2.set_ylim(minFr/20,10*maxFr)
+else:
+  ax1.set_ylim(0,10*maxFr)
+  ax2.set_ylim(0,10*maxFr)
+
+ax1.set_xlabel('Time [s]')
+ax1.set_ylabel('Frequency [Hz]')
+ax1.set_yscale("log")
+
+ax2.set_xlabel('Time [s]')
+ax2.set_ylabel('Frequency [Hz]')
+ax2.set_yscale("log")
+plt.colorbar(im1,ax=ax1,label='Power (dB)')
+plt.colorbar(im2,ax=ax2,label='Power (dB)')
+
+figure.set_size_inches(22, 8)
+plt.show()
