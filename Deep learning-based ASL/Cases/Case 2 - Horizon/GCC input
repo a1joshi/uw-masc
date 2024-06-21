@@ -1,0 +1,230 @@
+# ConvoNet model
+
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import datasets, layers, models
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import cmath as cm
+import math
+import random
+from scipy import signal
+import sys
+
+np.set_printoptions(threshold = sys.maxsize)
+np.set_printoptions(suppress=True)
+
+sources = 1
+microphones = 4
+classes = 20
+class_size = 9
+training_samples = 50000
+val_samples = 10000
+pred_samples = 1
+no_of_epochs = 10
+bs = 64
+c = 343 # speed of sound in air
+A = 10 # amplitude
+f = 10 # frequency
+
+# Microphone array (5 microphone array)
+
+x_mic = [0, 0, -1, 1]
+y_mic = [0, math.sqrt(3)/2, -math.sqrt(3)/2, -math.sqrt(3)/2]
+dist = 2
+
+pairs = 6 # microphone pairs
+
+# Generating training data
+
+def data_gen(x_mic,y_mic,sources,microphones):
+ r = 10
+ dist = 2
+ fs = 16000      # sampling frequency
+ no_of_coeff = round((fs*dist)/c)
+ tstep = 1/fs   # time-domain resolution
+ t = np.arange(0,1,tstep);
+ tt = np.arange(-1+tstep,1,tstep)
+
+ theta = np.random.uniform(0,180)  # Direction # was randint before
+ label = theta//class_size        # 0-8 labels
+
+ x_source = r*np.cos(np.pi*theta/180)
+ y_source = r*np.sin(np.pi*theta/180)
+
+ if (theta>90):
+   x_source = -r*np.cos(np.pi*(180-theta)/180)
+   y_source = r*np.sin(np.pi*(180-theta)/180)
+
+ rs = []
+ for i in range(microphones):
+  rs.append(((x_source - x_mic[i])**2 + (y_source - y_mic[i])**2)**0.5)
+ ds = []
+ for i in range(microphones-1):
+  for j in range(i+1,microphones):
+    ds.append(((x_source - x_mic[j])**2 + (y_source - y_mic[j])**2)**0.5 - ((x_source - x_mic[i])**2 + (y_source - y_mic[i])**2)**0.5)
+
+ ds = np.array(ds)
+ td = ds/c
+ dd = np.empty((len(td)),dtype=int)
+ dd = td*fs
+ corr = []
+
+ for i in range(pairs):
+  noise1 = np.random.normal(0,1,len(t))
+  x1 = A*np.sin(2*np.pi*f*t) + 10*noise1
+  x2 = []
+  for k in range(int(dd[i])):
+    x2.append(0)
+  noise2 = np.random.normal(0,1,len(t)-int(dd[i]))
+  x2[int(dd[i]):len(t)] = A*np.sin(2*np.pi*f*(t[0:len(t)-int(dd[i])]))
+  x2 = x2 + noise1
+
+  corr1 = signal.correlate(x1, x2, mode='full',method = 'auto')
+  corr_new = corr1/max(corr1)
+  mp = len(corr_new)//2
+  corr_new = list(np.array(corr_new))
+  corr = corr + corr_new[mp:mp+no_of_coeff]
+
+ corr = np.array(corr)
+ corr = corr.reshape(len(corr),1)
+ return corr,label
+
+
+training_data = np.empty((training_samples,6*93,1),dtype=float)
+training_labels = np.empty((training_samples,1), dtype=int)
+
+validation_data = np.empty((val_samples,6*93,1))
+validation_labels = np.empty((val_samples,1), dtype=int)
+
+pred_data = np.empty((pred_samples,6*93,1),dtype=float)
+pred_labels = np.empty((pred_samples,1), dtype=int)
+
+# Functions for training, validation and prediction data
+
+def training_data_gen():
+ for i in range(training_samples):
+  training_data[i],training_labels[i] = data_gen(x_mic,y_mic,sources,microphones)
+ return training_data,training_labels
+
+def val_data_gen():
+ for i in range(val_samples):
+  validation_data[i],validation_labels[i] = data_gen(x_mic,y_mic,sources,microphones)
+ return validation_data,validation_labels
+
+#########################################
+
+ut = training_data_gen()
+uv = val_data_gen()
+
+ut1 = ut[0].reshape(training_samples,31,18,1)
+uv1 = uv[0].reshape(val_samples,31,18,1)
+ut2 = ut[1]
+uv2 = uv[1]
+
+############################
+
+# Load the numpy arrays
+
+# np.save('file_name', your_array)
+
+ut1 = np.load('training_data_50000.npy')
+uv1 = np.load('val_data_10000.npy')
+ut2 = np.load('training_labels_180.npy')
+uv2 = np.load('val_labels_180.npy')
+
+ut2 = ut2 // class_size
+uv2 = uv2 // class_size
+################################
+
+# CNN
+
+model = models.Sequential()
+model.add(layers.Conv2D(128, (3,3), activation='relu', input_shape=(31,18,1)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.Flatten())
+model.add(layers.Dense(128, activation='relu'))
+model.add(layers.Dense(classes, activation='softmax'))
+
+opt = keras.optimizers.Adam(learning_rate=0.0001)
+model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics='accuracy')
+model.summary()
+
+###########################
+
+model.fit(ut1,ut2, validation_data = (uv1,uv2), batch_size = 64, epochs = 200)
+
+############################
+
+# Pred Data Gen Function
+
+def pred_data_gen():
+ r = 10
+ dist = 2
+ fs = 16000      # sampling frequency
+ no_of_coeff = round((fs*dist)/c)
+ tstep = 1/fs   # time-domain resolution
+ t = np.arange(0,1,tstep);
+ tt = np.arange(-1+tstep,1,tstep)
+
+ theta = np.random.uniform(0,180)  # Direction
+ label = theta//class_size        # 0-8 labels
+
+ x_source = r*np.cos(np.pi*theta/180)
+ y_source = r*np.sin(np.pi*theta/180)
+
+ if (theta>90):
+   x_source = -r*np.cos(np.pi*(180-theta)/180)
+   y_source = r*np.sin(np.pi*(180-theta)/180)
+
+ rs = []
+ for i in range(microphones):
+  rs.append(((x_source - x_mic[i])**2 + (y_source - y_mic[i])**2)**0.5)
+ ds = []
+ for i in range(microphones-1):
+  for j in range(i+1,microphones):
+    ds.append(((x_source - x_mic[j])**2 + (y_source - y_mic[j])**2)**0.5 - ((x_source - x_mic[i])**2 + (y_source - y_mic[i])**2)**0.5)
+
+ ds = np.array(ds)
+ td = ds/c
+ dd = np.empty((len(td)),dtype=int)
+ dd = td*fs
+ corr = []
+
+ for i in range(pairs):
+  noise1 = np.random.normal(0,1,len(t))
+  x1 = A*np.sin(2*np.pi*f*t) + 10*noise1
+  x2 = []
+  for k in range(int(dd[i])):
+    x2.append(0)
+  noise2 = np.random.normal(0,1,len(t)-int(dd[i]))
+  x2[int(dd[i]):len(t)] = A*np.sin(2*np.pi*f*(t[0:len(t)-int(dd[i])]))
+  x2 = x2 + noise1
+
+  corr1 = signal.correlate(x1, x2, mode='full',method = 'auto')
+  corr_new = corr1/max(corr1)
+  mp = len(corr_new)//2
+  corr_new = list(np.array(corr_new))
+  corr = corr + corr_new[mp:mp+no_of_coeff]
+
+ corr = np.array(corr)
+ corr = corr.reshape(len(corr),1)
+ return corr,label,theta
+
+##################################################
+
+# Prediction
+
+pred_samples = 1
+
+up1,up2,up3 = pred_data_gen()
+up1 = up1.reshape(pred_samples,31,18,1)
+z1 = model.predict(up1)
+print('Theta =',up3)
+print('Max Probability = ', np.max(z1))
+print('Prediction =', np.argmax(z1))
+print('Ground Truth =',up2)
