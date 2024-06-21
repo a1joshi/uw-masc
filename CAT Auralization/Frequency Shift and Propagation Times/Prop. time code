@@ -1,0 +1,122 @@
+# Propagation times
+
+import numpy as np
+import pandas as pd
+from scipy import signal
+import matplotlib.pyplot as plt
+from scipy.signal import spectrogram, find_peaks
+from sympy import pretty_print as pp, latex
+from sympy.abc import s
+import matplotlib
+
+plt.rcParams['font.size'] = 16  # Base font size
+
+dist = 1
+fs = 100       # sampling frequency
+tstep = 1/fs   # time-domain resolution
+N = 500           # number of samples for fft (was 200)
+fstep = fs/N   # frequency resolution
+
+# t = np.arange(0,0.1,tstep)
+t = np.arange(N)/float(fs)
+
+pt = pd.read_excel("propagation times.xlsx")
+
+r = np.array(pt["r"],dtype=int)
+
+pt_str_1000	= np.array(pt["pt_str_1000"],dtype=float)
+pt_cur_1000	= np.array(pt["pt_cur_1000"],dtype=float)
+pt_str_3000	= np.array(pt["pt_str_3000"],dtype=float)
+pt_cur_3000	=	np.array(pt["pt_cur_3000"],dtype=float)
+pt_str_5000	= np.array(pt["pt_str_5000"],dtype=float)
+pt_cur_5000	=	np.array(pt["pt_cur_5000"],dtype=float)
+pt_str_7500	= np.array(pt["pt_str_7500"],dtype=float)
+pt_cur_7500	=	np.array(pt["pt_cur_7500"],dtype=float)
+pt_str_10000 = np.array(pt["pt_str_10000"],dtype=float)
+pt_cur_10000 = np.array(pt["pt_cur_10000"],dtype=float)
+pt_str_15000 = np.array(pt["pt_str_15000"],dtype=float)
+pt_cur_15000 = np.array(pt["pt_cur_15000"],dtype=float)
+
+figure, ax = plt.subplots(6, 2)
+
+ax[0,0].plot(r,pt_str_1000,'-b')
+ax[0,0].plot(r,pt_cur_1000,'-r')
+ax[0,0].set_title('Propagation Times for Straight and Curved Rays, y = |1| km')
+ax[0,0].set_xlabel('x [m]')
+ax[0,0].set_ylabel('Propagation Time [s]')
+ax[0,0].legend(['straight ray','curved ray'],loc="upper right")
+
+ax[0,1].plot(r,np.zeros((len(r),1)),'--r')
+ax[0,1].plot(r,pt_str_1000-pt_cur_1000,'-g')
+ax[0,1].set_title('Differnce in Propagation Times (Straight Ray - Curved Ray), y = |1| km')
+ax[0,1].set_xlabel('x [m]')
+ax[0,1].set_ylabel('Differnce in Propagation Times [s]')
+
+
+ax[1,0].plot(r,pt_str_3000,'-b')
+ax[1,0].plot(r,pt_cur_3000,'-r')
+ax[1,0].set_title('Propagation Times for Straight and Curved Rays, y = |3| km')
+ax[1,0].set_xlabel('x [m]')
+ax[1,0].set_ylabel('Propagation Time [s]')
+ax[1,0].legend(['straight ray','curved ray'],loc="upper right")
+
+ax[1,1].plot(r,np.zeros((len(r),1)),'--r')
+ax[1,1].plot(r,pt_str_3000-pt_cur_3000,'-g')
+ax[1,1].set_title('Differnce in Propagation Times (Straight Ray - Curved Ray), y = |3| km')
+ax[1,1].set_xlabel('x [m]')
+ax[1,1].set_ylabel('Differnce in Propagation Times [s]')
+
+ax[2,0].plot(r,pt_str_5000,'-b')
+ax[2,0].plot(r,pt_cur_5000,'-r')
+ax[2,0].set_title('Propagation Times for Straight and Curved Rays, y = |5| km')
+ax[2,0].set_xlabel('x [m]')
+ax[2,0].set_ylabel('Propagation Time [s]')
+ax[2,0].legend(['straight ray','curved ray'],loc="upper right")
+
+ax[2,1].plot(r,np.zeros((len(r),1)),'--r')
+ax[2,1].plot(r,pt_str_5000-pt_cur_5000,'-g')
+ax[2,1].set_title('Differnce in Propagation Times (Straight Ray - Curved Ray), y = |5| km')
+ax[2,1].set_xlabel('x [m]')
+ax[2,1].set_ylabel('Differnce in Propagation Times [s]')
+
+ax[3,0].plot(r,pt_str_7500,'-b')
+ax[3,0].plot(r,pt_cur_7500,'-r')
+ax[3,0].set_title('Propagation Times for Straight and Curved Rays, y = |7.5| km')
+ax[3,0].set_xlabel('x [m]')
+ax[3,0].set_ylabel('Propagation Time [s]')
+ax[3,0].legend(['straight ray','curved ray'],loc="upper right")
+
+ax[3,1].plot(r,np.zeros((len(r),1)),'--r')
+ax[3,1].plot(r,pt_str_7500-pt_cur_7500,'-g')
+ax[3,1].set_title('Differnce in Propagation Times (Straight Ray - Curved Ray), y = |7.5| km')
+ax[3,1].set_xlabel('x [m]')
+ax[3,1].set_ylabel('Differnce in Propagation Times [s]')
+
+ax[4,0].plot(r,pt_str_10000,'-b')
+ax[4,0].plot(r,pt_cur_10000,'-r')
+ax[4,0].set_title('Propagation Times for Straight and Curved Rays, y = |10| km')
+ax[4,0].set_xlabel('x [m]')
+ax[4,0].set_ylabel('Propagation Time [s]')
+ax[4,0].legend(['straight ray','curved ray'],loc="upper right")
+
+ax[4,1].plot(r,np.zeros((len(r),1)),'--r')
+ax[4,1].plot(r,pt_str_10000-pt_cur_10000,'-g')
+ax[4,1].set_title('Differnce in Propagation Times (Straight Ray - Curved Ray), y = |10| km')
+ax[4,1].set_xlabel('x [m]')
+ax[4,1].set_ylabel('Differnce in Propagation Times [s]')
+
+ax[5,0].plot(r,pt_str_15000,'-b')
+ax[5,0].plot(r,pt_cur_15000,'-r')
+ax[5,0].set_title('Propagation Times for Straight and Curved Rays, y = |15| km')
+ax[5,0].set_xlabel('x [m]')
+ax[5,0].set_ylabel('Propagation Time [s]')
+ax[5,0].legend(['straight ray','curved ray'],loc="upper right")
+
+ax[5,1].plot(r,np.zeros((len(r),1)),'--r')
+ax[5,1].plot(r,pt_str_15000-pt_cur_15000,'-g')
+ax[5,1].set_title('Differnce in Propagation Times (Straight Ray - Curved Ray), y = |15| km')
+ax[5,1].set_xlabel('x [m]')
+ax[5,1].set_ylabel('Differnce in Propagation Times [s]')
+
+figure.set_size_inches(20, 70)
+plt.show()
