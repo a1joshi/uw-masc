@@ -1,0 +1,137 @@
+# Toy Problem 3 with analytical mics
+
+# ConvoNet model
+
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import datasets, layers, models
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import cmath as cm
+import math
+import random
+import sys
+
+
+np.set_printoptions(threshold = sys.maxsize)
+np.set_printoptions(suppress=True)
+
+sources = 1
+microphones = 4
+class1 = 60
+class_size1 = 3
+class2 = 30
+class_size2 = 3
+training_samples = 80000
+val_samples = 20000
+pred_samples = 1
+frequency = 100
+no_of_epochs = 10
+bs = 64
+
+# Microphone array (5 microphone array)
+
+x_mic = np.array([0, 0, -1, 1])
+y_mic = np.array([0, math.sqrt(3)/2, -math.sqrt(3)/2, -math.sqrt(3)/2])
+z_mic = np.array([0, 0, 0, 0])
+
+# Generating training data (cross-spectral-matrix and ground-truth-matrix)
+
+def data_gen(x_mic,y_mic,sources,microphones):
+
+ r = 10
+ theta = np.random.uniform(0,180)  # Direction
+ theta_label = theta//class_size1        # 0-8 labels for theta
+ phi = np.random.uniform(0,90)
+ phi_label = phi//class_size2            # 0-8 labels for phi
+ x_source = r*np.sin(np.pi*phi/180)*np.cos(np.pi*theta/180)
+ y_source = r*np.sin(np.pi*phi/180)*np.sin(np.pi*theta/180)
+ z_source = r*np.cos(np.pi*phi/180)
+ if (theta>90):
+   x_source = -r*np.sin(np.pi*phi/180)*np.cos(np.pi*(180-theta)/180)
+
+ p=np.empty(microphones,dtype=np.complex_)
+
+ for i in range(microphones):
+  rs = ((x_source-x_mic[i])**2 + (y_source-y_mic[i])**2 + (z_source-z_mic)**2)**0.5
+  p[i] = np.sum(np.exp( (-2*1j*math.pi*frequency*rs)/343)/(4*math.pi*rs))
+ p_H = np.conj(p)
+ sample = np.dot(p[:,None],p_H[None,:])
+ sample = np.array(sample.reshape(microphones,microphones,1))
+ return sample, theta_label, phi_label
+
+
+training_data = np.empty((training_samples,microphones,microphones,1),dtype=complex)
+theta_train = np.empty((training_samples,1), dtype=int)
+phi_train = np.empty((training_samples,1), dtype=int)
+
+validation_data = np.empty((val_samples,microphones,microphones,1),dtype=complex)
+theta_val = np.empty((val_samples,1), dtype=int)
+phi_val = np.empty((val_samples,1), dtype=int)
+
+pred_data = np.empty((pred_samples,microphones,microphones,1),dtype=complex)
+theta_pred = np.empty((pred_samples,1), dtype=int)
+phi_pred = np.empty((pred_samples,1), dtype=int)
+
+# Functions for training, validation and prediction data
+
+def training_data_gen():
+ for i in range(training_samples):
+  training_data[i],theta_train[i],phi_train[i] = data_gen(x_mic,y_mic,sources,microphones)
+ return training_data,theta_train,phi_train
+
+def val_data_gen():
+ for i in range(val_samples):
+  validation_data[i],theta_val[i], phi_val[i] = data_gen(x_mic,y_mic,sources,microphones)
+ return validation_data,theta_val,phi_val
+
+def pred_data_gen():
+ for i in range(pred_samples):
+  pred_data[i],theta_pred[i],phi_pred[i] = data_gen(x_mic,y_mic,sources,microphones)
+ return pred_data,theta_pred,phi_pred
+
+#######################################
+
+ut = training_data_gen()
+uv = val_data_gen()
+
+######################################
+
+# Multi-Task CNN
+
+inputs = tf.keras.layers.Input(shape=(microphones, microphones, 1), name='input')
+
+main_branch = tf.keras.layers.Conv2D(filters=128, kernel_size=(2, 2), strides=1, activation='relu')(inputs)
+main_branch = tf.keras.layers.Conv2D(filters=64, kernel_size=(2, 2), strides=1, activation='relu')(main_branch)
+main_branch = tf.keras.layers.Flatten()(main_branch)
+
+theta_branch = tf.keras.layers.Dense(128, activation='relu')(main_branch)
+theta_branch = tf.keras.layers.Dense(class1, activation='softmax', name='theta_output')(theta_branch)
+
+phi_branch = tf.keras.layers.Dense(128, activation='relu')(main_branch)
+phi_branch = tf.keras.layers.Dense(class2, activation='softmax', name='phi_output')(phi_branch)
+
+model = tf.keras.Model(inputs = inputs, outputs = [theta_branch, phi_branch])
+
+opt = keras.optimizers.Adam(learning_rate=0.00001)
+model.compile(optimizer=opt, loss={'theta_output': 'sparse_categorical_crossentropy', 'phi_output': 'sparse_categorical_crossentropy'}, loss_weights={'theta_output': 0.5, 'phi_output': 1 - 0.5}, metrics='accuracy')
+model.summary()
+
+######################################
+
+model.fit({'input': ut[0]},{'theta_output': ut[1], 'phi_output': ut[2]}, validation_data = ({'input': uv[0]},{'theta_output': uv[1], 'phi_output': uv[2]}), batch_size=64, epochs = 200)
+
+############################
+
+# Prediction New
+
+up = pred_data_sample_gen()
+z1 = model.predict(up[0])
+print(z1[0])
+print(np.argmax(z1[0]))
+print(up[1])
+
+print(z1[1])
+print(np.argmax(z1[1]))
+print(up[2])
