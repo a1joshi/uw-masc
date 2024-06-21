@@ -1,0 +1,175 @@
+# ConvoNet model
+
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import datasets, layers, models
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import cmath as cm
+import math
+import random
+from scipy import signal
+import sys
+from numpy.fft import fft, ifft
+
+np.set_printoptions(threshold = sys.maxsize)
+np.set_printoptions(suppress=True)
+
+sources = 1
+microphones = 4
+class1 = 60
+class_size1 = 3
+class2 = 30
+class_size2 = 3
+training_samples = 80000
+val_samples = 16000
+pred_samples = 1
+no_of_epochs = 100
+c = 343 # speed of sound in air
+A = 10 # amplitude
+f = 10 # frequency
+
+# Microphone array (3 microphone array)
+
+x_mic = [0, 0, -1, 1]
+y_mic = [0, math.sqrt(3)/2, -math.sqrt(3)/2, -math.sqrt(3)/2]
+dist = 2
+z_mic = np.array([0, 0, 0, 0])
+pairs = 6 # microphone pairs
+
+r = 10
+fs = 16000      # sampling frequency
+no_of_coeff = round((fs*dist)/c)
+tstep = 1/fs   # time-domain resolution
+t = np.arange(0,1,tstep);
+tt = np.arange(-1+tstep,1,tstep)
+
+def data_gen(x_mic,y_mic,sources,microphones):
+
+ theta = np.random.uniform(0,180)  # Direction
+ theta_label = theta//class_size1        # 0-8 labels for theta
+ phi = np.random.uniform(0,90)
+ phi_label = phi//class_size2            # 0-8 labels for phi
+ x_source = r*np.sin(np.pi*phi/180)*np.cos(np.pi*theta/180)
+ y_source = r*np.sin(np.pi*phi/180)*np.sin(np.pi*theta/180)
+ z_source = r*np.cos(np.pi*phi/180)
+ if (theta>90):
+   x_source = -r*np.sin(np.pi*phi/180)*np.cos(np.pi*(180-theta)/180)
+
+ rs = []
+ for i in range(microphones):
+  rs.append(((x_source - x_mic[i])**2 + (y_source - y_mic[i])**2 + (z_source - z_mic[i])**2)**0.5)
+ ds = []
+ for i in range(microphones-1):
+  for j in range(i+1,microphones):
+    ds.append(((x_source - x_mic[j])**2 + (y_source - y_mic[j])**2)**0.5 + (z_source - z_mic[j])**2 - ((x_source - x_mic[i])**2 + (y_source - y_mic[i])**2 + (z_source - z_mic[i])**2)**0.5)
+
+ ds = np.array(ds)
+ td = ds/c
+ dd = np.empty((len(td)),dtype=int)
+ dd = td*fs
+ corr = []
+
+ for i in range(pairs):
+  noise1 = np.random.normal(0,1,len(t))
+  x1 = A*np.sin(2*np.pi*f*t) + 10*noise1
+  x2 = []
+  for k in range(int(dd[i])):
+    x2.append(0)
+  noise2 = np.random.normal(0,1,len(t)-int(dd[i]))
+  x2[int(dd[i]):len(t)] = A*np.sin(2*np.pi*f*(t[0:len(t)-int(dd[i])]))
+  x2 = x2 + noise1
+
+  corr1 = signal.correlate(x1, x2, mode='full',method = 'auto')
+  corr_new = corr1/max(corr1)
+  mp = len(corr_new)//2
+  corr_new = list(np.array(corr_new))
+  corr = corr + corr_new[mp:mp+no_of_coeff]
+
+ corr = np.array(corr)
+ corr = corr.reshape(len(corr),1)
+ return corr,theta_label, phi_label
+
+training_data = np.empty((training_samples,6*93,1),dtype=float)
+theta_train = np.empty((training_samples,1), dtype=int)
+phi_train = np.empty((training_samples,1), dtype=int)
+
+validation_data = np.empty((val_samples,6*93,1))
+theta_val = np.empty((val_samples,1), dtype=int)
+phi_val = np.empty((val_samples,1), dtype=int)
+
+pred_data = np.empty((pred_samples,6*93,1),dtype=float)
+theta_pred = np.empty((pred_samples,1), dtype=int)
+phi_pred = np.empty((pred_samples,1), dtype=int)
+
+# Functions for training, validation and prediction data
+
+def training_data_gen():
+ for i in range(training_samples):
+  training_data[i],theta_train[i],phi_train[i] = data_gen(x_mic,y_mic,sources,microphones)
+ return training_data,theta_train,phi_train
+
+def val_data_gen():
+ for i in range(val_samples):
+  validation_data[i],theta_val[i], phi_val[i] = data_gen(x_mic,y_mic,sources,microphones)
+ return validation_data,theta_val,phi_val
+
+def pred_data_gen():
+ for i in range(pred_samples):
+  pred_data[i],theta_pred[i],phi_pred[i] = data_gen(x_mic,y_mic,sources,microphones)
+ return pred_data,theta_pred,phi_pred
+
+##################################
+
+ut = training_data_gen()
+uv = val_data_gen()
+
+############################
+
+ut0 = np.load('training_data_80000_3D.npy')
+ut1 = np.load('theta_training_labels.npy')
+ut2 = np.load('phi_training_labels.npy')
+
+uv0 = np.load('val_data_16000_3D.npy')
+uv1 = np.load('theta_val_labels.npy')
+uv2 = np.load('phi_val_labels.npy')
+
+############################
+
+ut0 = ut0.reshape(training_samples,31,18,1)
+uv0 = uv0.reshape(val_samples,31,18,1)
+
+ut1 = ut1 // class_size1
+ut2 = ut2 // class_size2
+uv1 = uv1 // class_size1
+uv2 = uv2 // class_size2
+
+########################
+
+# Multi-Task CNN
+
+inputs = tf.keras.layers.Input(shape=(31, 18, 1), name='input')
+
+main_branch = tf.keras.layers.Conv2D(filters=128, kernel_size=(2, 2), strides=1, activation='relu')(inputs)
+main_branch = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(main_branch)
+main_branch = tf.keras.layers.Conv2D(filters=64, kernel_size=(2, 2), strides=1, activation='relu')(main_branch)
+main_branch = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(main_branch)
+main_branch = tf.keras.layers.Conv2D(filters=64, kernel_size=(2, 2), strides=1, activation='relu')(main_branch)
+main_branch = tf.keras.layers.Flatten()(main_branch)
+
+theta_branch = tf.keras.layers.Dense(128, activation='relu')(main_branch)
+theta_branch = tf.keras.layers.Dense(class1, activation='softmax', name='theta_output')(theta_branch)
+
+phi_branch = tf.keras.layers.Dense(128, activation='relu')(main_branch)
+phi_branch = tf.keras.layers.Dense(class2, activation='softmax', name='phi_output')(phi_branch)
+
+model = tf.keras.Model(inputs = inputs, outputs = [theta_branch, phi_branch])
+
+opt = keras.optimizers.Adam(learning_rate=0.0001)
+model.compile(optimizer=opt, loss={'theta_output': 'sparse_categorical_crossentropy', 'phi_output': 'sparse_categorical_crossentropy'}, loss_weights={'theta_output': 0.5, 'phi_output': 1 - 0.5}, metrics='accuracy')
+model.summary()
+
+####################################
+
+model.fit({'input': ut0},{'theta_output': ut1, 'phi_output': ut2}, validation_data = ({'input': uv0},{'theta_output': uv1, 'phi_output': uv2}), batch_size=64, epochs = 200)
