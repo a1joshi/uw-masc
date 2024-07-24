@@ -1,5 +1,4 @@
-% Combined code for rays emitted by a source, eigenray plotting, and
-% calculation of propagation parameters
+% Combined code for eigenrays and calculation of propagation parameters
 
 tic
 %% ---Checking ARTMatlab version---
@@ -34,19 +33,19 @@ eg = AtmosphericRay;
 
 %% Source and initial directions
 
-v = 20; % interval (was 20 for -50 to 50 km)(9.8 for direct)
+v = 20; % interval (change to v = 10000 for range of detection plots)
 v_plane = 200;
 v_wind = 20;
 c = 299.466; % speed of sound at the receiver (at 10 km altitude)
 fs = 10; % source frequency 
-r0 = 50000;
+r0 = 50000; (change to r0 = 100000 for range of detection plots)
 r = -r0:v:r0; % source x-coordinate
 
 sx = 0;
 sy = 0;
 sz = 10000;
 rz = 10000;
-ry = -1000;
+ry = -1000;  (change to ry = -5000 for range of detection plots)
 
 fo = zeros(length(r),1);
 sploss = zeros(length(r),1);
@@ -74,7 +73,7 @@ rayNormalVectors = AtmosphericRayTracer.AnglesToNormalVectors(theta0, phi0);
 
 %--General--
 
-art.maxPropagationTime = 200;                    %Maximum propagation time of rays [s] (was 200 s)
+art.maxPropagationTime = 350;                    %Maximum propagation time of rays [s] (was 200 s)
 art.integrationTimeStep = 0.5;                  %Base time-step for integration of rays [s]
 art.solverMethod = 'runge-kutta';             %Maximum propagation time of rays [s]
 art.maxReflectionOrder = 1;             %Maximum number of considered reflections (=number of eigenrays) [] (integer)
@@ -209,7 +208,7 @@ disp(sploss);
 figure;
 plot(r,fo,'d');
 
-% Atmospheric attenuation plot for the first ray (at x = -50000 m)
+% Atmospheric attenuation plot for the first ray (left extreme)
 attenuation = propagationModel.AirAttenuation(eg);
 attenuationITA = itaResult(attenuation(:,1), propagationModel.frequencyVector, 'freq');
 attenuationITA.comment = 'Air attenuation';
