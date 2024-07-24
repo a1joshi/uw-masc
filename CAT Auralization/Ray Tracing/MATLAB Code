@@ -11,7 +11,7 @@ atmos = StratifiedAtmosphere;
 %Settings
 %(These are the default settings, StratifiedAtmosphere is already initialized with these values)
 atmos.windProfile = 'constant';          %String: 'zero', 'constant', 'log'
-atmos.temperatureProfile = 'isa';   %String: 'constant', 'isa'
+atmos.temperatureProfile = 'isa';   %String: 'constant', 'isa' (change to 'constant' for straight ray tracing)
 atmos.humidityProfile = 'constant'; %String: 'constant'
 
 atmos.surfaceRoughness = 0.1;       %Surface Roughness for Log Wind Profile [m]
@@ -19,7 +19,7 @@ atmos.frictionVelocity = 0.6;       %Friction velocity for Log Wind Profile [m/s
 
 atmos.constWindDirection = [1 1 0]; %Normal in wind direction []
 
-atmos.constTemperature = 293;       %Temperature for Const mode [K]
+atmos.constTemperature = 223.15;       %Temperature for Const mode [K]
 atmos.constStaticPressure = 101325; %Static pressure used in a constant temperature profile
 
 atmos.constWindVelocity = 20;       %Wind velocity for Const Wind Profile [m/s]
